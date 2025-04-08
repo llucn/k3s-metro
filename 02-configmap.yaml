@@ -1,0 +1,86 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-yml
+  namespace: metro
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              # - alertmanager:9093
+    rule_files:
+      # - "first_rules.yml"
+      # - "second_rules.yml"
+    scrape_configs:
+      - job_name: "prometheus"
+        static_configs:
+          - targets: ["localhost:9090"]
+      - job_name: "traefik"
+        metrics_path: '/metrics'
+        static_configs:
+        - targets:
+          - 'traefik-metrics.kube-system:9100'
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_endpoints_name]
+          regex: 'node-exporter'
+          action: keep
+      - job_name: 'springboot2'
+        metrics_path: '/actuator/prometheus'
+        static_configs:
+        - targets:
+          - 'metro-agent:8080'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebrowser-json
+  namespace: metro
+data:
+  filebrowser_json: |
+    {
+      "port": 80,
+      "baseURL": "",
+      "address": "",
+      "log": "stdout",
+      "database": "/database.db",
+      "root": "/files"
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeconfig-yaml
+  namespace: metro
+data:
+  kubeconfig.yaml: |
+    apiVersion: v1
+    clusters:
+    - cluster:
+        certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJkekNDQVIyZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWpNU0V3SHdZRFZRUUREQmhyTTNNdGMyVnkKZG1WeUxXTmhRREUzTkRNeE1qYzBPRGd3SGhjTk1qVXdNekk0TURJd05EUTRXaGNOTXpVd016STJNREl3TkRRNApXakFqTVNFd0h3WURWUVFEREJock0zTXRjMlZ5ZG1WeUxXTmhRREUzTkRNeE1qYzBPRGd3V1RBVEJnY3Foa2pPClBRSUJCZ2dxaGtqT1BRTUJCd05DQUFSb1A1RGpmUElhdCtJWm0veTN5dkg2YmdqV1BwRUhDYW9wMUJpRmprOEEKRUoyQ0dkMnpreWtDRGdiNGZwMUJDOXNpbjNXaVZCenY4YVFFL2VOczFsQTFvMEl3UURBT0JnTlZIUThCQWY4RQpCQU1DQXFRd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVUt2SkxBZzBOV3ZXOWxqN3FPNGVLCkEwUVR0eE13Q2dZSUtvWkl6ajBFQXdJRFNBQXdSUUlnVUlvMktaUXM3RFJHaStvTjJaSUNoTXMxYWJVTEtESW8KMjlVZTRCRkpOeUVDSVFEaFRBZkNuV2lVQTlxcCs2YXFSQTZUWEUxSkRBMkJ5cHY1ZVpSKzZZQlhwUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+        server: https://192.168.10.221:6443
+      name: default
+    contexts:
+    - context:
+        cluster: default
+        user: default
+      name: default
+    current-context: default
+    kind: Config
+    preferences: {}
+    users:
+    - name: default
+      user:
+        client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJrakNDQVRlZ0F3SUJBZ0lJVCtibSs5NlhoQWN3Q2dZSUtvWkl6ajBFQXdJd0l6RWhNQjhHQTFVRUF3d1kKYXpOekxXTnNhV1Z1ZEMxallVQXhOelF6TVRJM05EZzRNQjRYRFRJMU1ETXlPREF5TURRME9Gb1hEVEkyTURNeQpPREF5TURRME9Gb3dNREVYTUJVR0ExVUVDaE1PYzNsemRHVnRPbTFoYzNSbGNuTXhGVEFUQmdOVkJBTVRESE41CmMzUmxiVHBoWkcxcGJqQlpNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQTBJQUJFLzF4d3VZNVVoSEVXYUkKNTBBSUM5bG1JdG45S2grMDFWbDVSd0Rwdk9NeWVaVjlBMFZTS0hRMGdreGNuYmFOVFl4d3NYb1lwNHltbVorSQpuclNOQ01halNEQkdNQTRHQTFVZER3RUIvd1FFQXdJRm9EQVRCZ05WSFNVRUREQUtCZ2dyQmdFRkJRY0RBakFmCkJnTlZIU01FR0RBV2dCUkJqSHFyZUJaekZZUkxVckxoWUQwWDZrMWFTekFLQmdncWhrak9QUVFEQWdOSkFEQkcKQWlFQTQ4eUJCOURmTVllSHVGN2xTOWttcWNjRTI1cU9YRzRrc1B3TnpDTWhsOHdDSVFEOWc4YitxdEJzUVRNQQp4clpRVEVyZC9Dc3BZUFo3c1VHNUxJa2lYMlYvYVE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpNSUlCZGpDQ0FSMmdBd0lCQWdJQkFEQUtCZ2dxaGtqT1BRUURBakFqTVNFd0h3WURWUVFEREJock0zTXRZMnhwClpXNTBMV05oUURFM05ETXhNamMwT0Rnd0hoY05NalV3TXpJNE1ESXdORFE0V2hjTk16VXdNekkyTURJd05EUTQKV2pBak1TRXdId1lEVlFRRERCaHJNM010WTJ4cFpXNTBMV05oUURFM05ETXhNamMwT0Rnd1dUQVRCZ2NxaGtqTwpQUUlCQmdncWhrak9QUU1CQndOQ0FBVHA5dWpIQitIU2FHSmpUcldub05vTmRrNFpMelNielpJd1FzWngvNUJuClRLaDhISm9pbUg2WkZNZEVrWUJTQkpsUVhuT1F6aG5BTG41ODZPcFJUbW56bzBJd1FEQU9CZ05WSFE4QkFmOEUKQkFNQ0FxUXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QWRCZ05WSFE0RUZnUVVRWXg2cTNnV2N4V0VTMUt5NFdBOQpGK3BOV2tzd0NnWUlLb1pJemowRUF3SURSd0F3UkFJZ0haQlJOV01PYStHUnQ5dlNIVkc2dkRqVVIrdGZsZXJlCkVDbGtMRlVXOVFZQ0lEKzlaQm9MNjQzTU5TdHlMRks1ZXlkeEkrMENJR1RRa2I0SmpCVFlzRFVDCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+        client-key-data: LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSU40Qnhub3dnalNLWlBuWTZ6eXVERXJWd2orR01sQmdRRXk0R2JtdGZFMjdvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFVC9YSEM1amxTRWNSWm9qblFBZ0wyV1lpMmYwcUg3VFZXWGxIQU9tODR6SjVsWDBEUlZJbwpkRFNDVEZ5ZHRvMU5qSEN4ZWhpbmpLYVpuNGlldEkwSXhnPT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=
+

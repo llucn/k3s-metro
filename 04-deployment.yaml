@@ -1,0 +1,269 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebrowser
+  namespace: metro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filebrowser
+  template:
+    metadata:
+      labels:
+        app: filebrowser
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: filebrowser-json
+        configMap: 
+          name: filebrowser-json
+          items:
+          - key: filebrowser_json
+            path: .filebrowser.json
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      containers:
+      - name: filebrowser
+        image: filebrowser/filebrowser:v2.32.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        volumeMounts:
+        - name: filebrowser-json
+          mountPath: /.filebrowser.json
+          subPath: .filebrowser.json
+        - name: files
+          mountPath: /files
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: detect-faces-in-image
+  namespace: metro
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: detect-faces-in-image
+  template:
+    metadata:
+      labels:
+        app: detect-faces-in-image
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      containers:
+      - name: detect-faces-in-image
+        image: face_recognition:v1.1
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5001
+          protocol: TCP
+        volumeMounts:
+        - name: files
+          mountPath: /files
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-recognition
+  namespace: metro
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: face-recognition
+  template:
+    metadata:
+      labels:
+        app: face-recognition
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      containers:
+      - name: face-recognition
+        image: face_recognition:v1.1
+        imagePullPolicy: Never
+        workingDir: "/files"
+        command: ["sleep", "infinity"]
+        volumeMounts:
+        - name: files
+          mountPath: /files
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metro-agent
+  namespace: metro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metro-agent
+  template:
+    metadata:
+      labels:
+        app: metro-agent
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: kubeconfig-yaml
+        configMap: 
+          name: kubeconfig-yaml
+      - name: files
+        persistentVolumeClaim:
+          claimName: files
+      containers:
+      - name: metro-agent
+        image: metro-agent:v1.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: kubeconfig-yaml
+          mountPath: /config
+        - name: files
+          mountPath: /files
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: metro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: prometheus-yml
+        configMap: 
+          name: prometheus-yml
+      - name: prometheus
+        persistentVolumeClaim:
+          claimName: prometheus
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.2.1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        volumeMounts:
+        - name: prometheus-yml
+          mountPath: /etc/prometheus
+        - name: prometheus
+          mountPath: /prometheus
+  strategy:
+    type: Recreate
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: metro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      volumes:
+      - name: grafana
+        persistentVolumeClaim:
+          claimName: grafana
+      containers:
+      - name: grafana
+        image: grafana/grafana:11.6.0
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: admin
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: admin
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: 'false'
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        volumeMounts:
+        - name: grafana
+          mountPath: /var/lib/grafana
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/name: node-exporter
+  name: node-exporter
+  namespace: metro
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: exporter
+      app.kubernetes.io/name: node-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: exporter
+        app.kubernetes.io/name: node-exporter
+    spec:
+      serviceAccountName: metro-sa-clusteradmin
+      containers:
+      - args:
+        - --path.sysfs=/host/sys
+        - --path.rootfs=/host/root
+        - --no-collector.wifi
+        - --no-collector.hwmon
+        - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/pods/.+)($|/)
+        - --collector.netclass.ignored-devices=^(veth.*)$
+        name: node-exporter
+        image: prom/node-exporter:v1.9.1
+        ports:
+          - containerPort: 9100
+            protocol: TCP
+        volumeMounts:
+        - mountPath: /host/sys
+          mountPropagation: HostToContainer
+          name: sys
+          readOnly: true
+        - mountPath: /host/root
+          mountPropagation: HostToContainer
+          name: root
+          readOnly: true
+      volumes:
+      - hostPath:
+          path: /sys
+        name: sys
+      - hostPath:
+          path: /
+        name: root

@@ -1,0 +1,30 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clean-files
+  namespace: metro
+spec:
+  schedule: "*/50 * * * *"
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          volumes:
+          - name: files
+            persistentVolumeClaim:
+              claimName: files
+          containers:
+          - name: clean-files
+            image: busybox
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+            volumeMounts:
+            - name: files
+              mountPath: /files
+          restartPolicy: OnFailure
+

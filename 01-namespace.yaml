@@ -1,0 +1,42 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metro
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metro-sa-clusteradmin
+  namespace: metro
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metro-crb-clusteradmin
+  namespace: metro
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: metro-sa-clusteradmin
+  namespace: metro
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-operator-admin
+  namespace: metro
+subjects:
+- kind: ServiceAccount
+  name: metro-sa-clusteradmin
+  namespace: metro
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
